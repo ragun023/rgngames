@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RGNGAMES — Arcade Multijoueur</title>
+<meta name="description" content="RGNGAMES — Jeux arcade multijoueur en ligne. Snake.io, Tetris Battle Royale et plus encore.">
+<link rel="canonical" href="https://ragun023.github.io/rgngames/">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:       #050508;
+  --surface:  #0c0c14;
+  --panel:    #10101c;
+  --border:   #1c1c2e;
+  --accent:   #e8ff00;
+  --hot:      #ff2d55;
+  --ice:      #00d4ff;
+  --text:     #dde0ff;
+  --muted:    #4a4a6a;
+  --soon:     #2a2a3e;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,.08) 3px,
+    rgba(0,0,0,.08) 4px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ── NOISE TEXTURE ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px;
+  pointer-events: none;
+  z-index: 999;
+  opacity: .6;
+}
+
+/* ── BACKGROUND GRID ── */
+.bg-grid {
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(232,255,0,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,255,0,.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
+}
+
+/* ── GLOW BLOBS ── */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  z-index: 0;
+}
+.blob-1 { width:600px; height:600px; background:rgba(232,255,0,.04); top:-200px; left:-200px; }
+.blob-2 { width:500px; height:500px; background:rgba(255,45,85,.05);  bottom:-200px; right:-100px; }
+.blob-3 { width:400px; height:400px; background:rgba(0,212,255,.04);  top:50%; left:50%; transform:translate(-50%,-50%); }
+
+/* ── LAYOUT ── */
+main {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 2rem 4rem;
+}
+
+/* ── HEADER ── */
+header {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 0 0;
+  margin-bottom: 3.5rem;
+}
+
+.logo-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+}
+
+.logo-rgn {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  color: var(--accent);
+  letter-spacing: .08em;
+  line-height: 1;
+  text-shadow: 0 0 60px rgba(232,255,0,.35);
+  position: relative;
+}
+.logo-rgn::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.logo-games {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  color: var(--text);
+  letter-spacing: .08em;
+  line-height: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  color: var(--hot);
+  text-transform: uppercase;
+  border: 1px solid rgba(255,45,85,.3);
+  padding: .35rem .75rem;
+}
+
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--hot);
+  animation: blink 1.2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,45,85,.6)} 50%{opacity:.5;box-shadow:0 0 0 4px rgba(255,45,85,0)} }
+
+.player-count {
+  font-size: .8rem;
+  color: var(--muted);
+  letter-spacing: .05em;
+}
+.player-count span { color: var(--ice); font-weight: 700; }
+
+/* ── SECTION TITLE ── */
+.section-label {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.section-label h2 {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: .15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── GAMES GRID ── */
+.games-grid {
+  width: 100%;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 3rem;
+}
+
+/* ── GAME CARD ── */
+.game-card {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .2s, border-color .2s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.game-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+}
+.game-card:hover .card-glow { opacity: 1; }
+.game-card:hover .play-btn { opacity: 1; transform: translateY(0); }
+.game-card:hover .card-art { transform: scale(1.04); }
+
+.card-glow {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at top, rgba(232,255,0,.05) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+
+/* ── ART AREA ── */
+.card-art-wrap {
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+  background: var(--surface);
+}
+
+.card-art {
+  width: 100%;
+  height: 100%;
+  transition: transform .4s;
+}
+
+/* SNAKE art */
+.art-snake {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #07070f;
+  position: relative;
+  overflow: hidden;
+}
+.art-snake .grid-bg {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(0,255,136,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.art-snake svg { position: relative; z-index: 1; }
+
+/* TETRIS art */
+.art-tetris {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #07070f;
+  position: relative;
+  overflow: hidden;
+}
+.art-tetris .noise-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(255,45,85,.08) 0%, transparent 70%);
+}
+.art-tetris svg { position: relative; z-index: 1; }
+
+/* SOON art */
+.art-soon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--soon);
+}
+
+/* ── CARD BODY ── */
+.card-body {
+  padding: 1.2rem 1.4rem 1.4rem;
+}
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: .6rem;
+}
+
+.card-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: .06em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.tag {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: .25rem .6rem;
+  flex-shrink: 0;
+}
+.tag-live    { background: rgba(0,212,255,.12); color: var(--ice); border: 1px solid rgba(0,212,255,.25); }
+.tag-coming  { background: rgba(255,45,85,.1);  color: var(--hot); border: 1px solid rgba(255,45,85,.2); }
+.tag-wip     { background: rgba(232,255,0,.08); color: var(--accent); border: 1px solid rgba(232,255,0,.2); }
+
+.card-desc {
+  font-size: .88rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 1.1rem;
+  font-weight: 500;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.meta-item .dot-sm { width: 5px; height: 5px; border-radius: 50%; }
+
+.play-btn {
+  margin-left: auto;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: .8rem;
+  letter-spacing: .12em;
+  padding: .5rem 1rem;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .2s, transform .2s;
+}
+
+/* ── SOON CARD ── */
+.game-card.card-soon {
+  opacity: .55;
+  cursor: default;
+  pointer-events: none;
+}
+.game-card.card-soon:hover { transform: none; border-color: var(--border); }
+
+/* ── FEATURED STRIP (Snake hero) ── */
+.hero-card {
+  width: 100%;
+  max-width: 1100px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  overflow: hidden;
+  margin-bottom: 3.5rem;
+  position: relative;
+  transition: border-color .2s;
+  text-decoration: none;
+  color: inherit;
+}
+.hero-card:hover { border-color: var(--accent); }
+.hero-card:hover .hero-art { transform: scale(1.03); }
+.hero-card:hover .hero-play { background: var(--accent); color: #000; }
+.hero-card:hover .hero-glow { opacity: 1; }
+
+.hero-glow {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at left center, rgba(232,255,0,.04) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+
+.hero-content {
+  padding: 2.5rem 2.8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 28px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.hero-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  letter-spacing: .06em;
+  line-height: 1;
+  color: var(--text);
+}
+.hero-title span { color: var(--accent); }
+
+.hero-desc {
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1.6;
+  font-weight: 500;
+  max-width: 400px;
+}
+
+.hero-tags {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.hero-tag {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  padding: .3rem .65rem;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.hero-play {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: .95rem;
+  letter-spacing: .15em;
+  padding: .9rem 1.8rem;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+.hero-art-wrap {
+  overflow: hidden;
+  background: #07070f;
+  position: relative;
+}
+.hero-art {
+  width: 100%;
+  height: 100%;
+  transition: transform .5s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-art-bg {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(0,255,136,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── SOON SECTION ── */
+.soon-grid {
+  width: 100%;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 3rem;
+}
+
+.soon-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.4rem 1.6rem;
+  position: relative;
+  overflow: hidden;
+}
+.soon-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--border);
+}
+
+.soon-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: .08em;
+  color: rgba(221,224,255,.3);
+  margin-bottom: .4rem;
+}
+.soon-sub {
+  font-size: .78rem;
+  color: var(--muted);
+  font-weight: 500;
+  line-height: 1.5;
+}
+.soon-tag {
+  display: inline-block;
+  margin-top: .8rem;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: .2rem .5rem;
+}
+
+/* ── FOOTER ── */
+footer {
+  width: 100%;
+  max-width: 1100px;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .75rem;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: .05em;
+}
+.footer-logo {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: .9rem;
+  color: var(--accent);
+  letter-spacing: .1em;
+}
+
+/* ── ANIMATED SNAKE SVG ── */
+@keyframes snakeMarch {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -240; }
+}
+.snake-path {
+  stroke-dasharray: 16 4;
+  animation: snakeMarch 2s linear infinite;
+}
+
+/* ── TETRIS FALL ── */
+@keyframes tetFall {
+  0%   { transform: translateY(-60px); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.tet-block { animation: tetFall .8s ease-out both; }
+
+/* ── PARTICLE TICKER ── */
+.ticker-wrap {
+  width: 100%;
+  max-width: 1100px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 3rem;
+  padding: .5rem 0;
+}
+.ticker {
+  display: flex;
+  gap: 3rem;
+  animation: ticker 18s linear infinite;
+  width: max-content;
+}
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.ticker-item {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.ticker-item span { color: var(--accent); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+  .hero-card { grid-template-columns: 1fr; }
+  .hero-art-wrap { height: 200px; }
+  .hero-content { padding: 1.8rem; }
+  header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<main>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-wrap">
+      <span class="logo-rgn">RGN</span>
+      <span class="logo-games">GAMES</span>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>En ligne</div>
+      <div class="player-count"><span id="playerCount">—</span> joueurs actifs</div>
+    </div>
+  </header>
+
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker" id="ticker">
+      <div class="ticker-item"><span>★</span> SNAKE.IO — DISPONIBLE</div>
+      <div class="ticker-item"><span>◈</span> TETRIS BATTLE ROYALE — EN DÉVELOPPEMENT</div>
+      <div class="ticker-item"><span>▲</span> PLUS DE JEUX À VENIR</div>
+      <div class="ticker-item"><span>★</span> RGNGAMES — ARCADE EN LIGNE</div>
+      <div class="ticker-item"><span>◈</span> MULTIJOUEUR TEMPS RÉEL</div>
+      <div class="ticker-item"><span>▲</span> COMPÉTITIF · RAPIDE · GRATUIT</div>
+      <!-- duplicate for seamless loop -->
+      <div class="ticker-item"><span>★</span> SNAKE.IO — DISPONIBLE</div>
+      <div class="ticker-item"><span>◈</span> TETRIS BATTLE ROYALE — EN DÉVELOPPEMENT</div>
+      <div class="ticker-item"><span>▲</span> PLUS DE JEUX À VENIR</div>
+      <div class="ticker-item"><span>★</span> RGNGAMES — ARCADE EN LIGNE</div>
+      <div class="ticker-item"><span>◈</span> MULTIJOUEUR TEMPS RÉEL</div>
+      <div class="ticker-item"><span>▲</span> COMPÉTITIF · RAPIDE · GRATUIT</div>
+    </div>
+  </div>
+
+  <!-- HERO: SNAKE.IO -->
+  <a class="hero-card" href="snake-multiplayer.html">
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow">Jeu vedette</div>
+      <div class="hero-title">SNAKE<span>.io</span></div>
+      <p class="hero-desc">
+        Le classique revisité en multijoueur en ligne. Mange, grandis, élimine.
+        Ramasse des bonus pour prendre l'avantage sur tes adversaires.
+      </p>
+      <div class="hero-tags">
+        <span class="hero-tag">Multijoueur</span>
+        <span class="hero-tag">Temps réel</span>
+        <span class="hero-tag">Bonus</span>
+        <span class="hero-tag">Classement</span>
+      </div>
+      <span class="hero-play">▶ JOUER MAINTENANT</span>
+    </div>
+    <div class="hero-art-wrap">
+      <div class="hero-art-bg"></div>
+      <div class="hero-art">
+        <svg width="260" height="260" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Snake body segments -->
+          <rect x="20" y="120" width="18" height="18" rx="3" fill="#00ff88" opacity=".2"/>
+          <rect x="42" y="120" width="18" height="18" rx="3" fill="#00ff88" opacity=".3"/>
+          <rect x="64" y="120" width="18" height="18" rx="3" fill="#00ff88" opacity=".4"/>
+          <rect x="86" y="120" width="18" height="18" rx="3" fill="#00ff88" opacity=".5"/>
+          <rect x="108" y="120" width="18" height="18" rx="3" fill="#00ff88" opacity=".65"/>
+          <rect x="108" y="98" width="18" height="18" rx="3" fill="#00ff88" opacity=".75"/>
+          <rect x="108" y="76" width="18" height="18" rx="3" fill="#00ff88" opacity=".85"/>
+          <rect x="130" y="76" width="18" height="18" rx="3" fill="#00ff88" opacity=".9"/>
+          <rect x="152" y="76" width="18" height="18" rx="3" fill="#00ff88" opacity=".95"/>
+          <!-- Head -->
+          <rect x="174" y="76" width="20" height="20" rx="4" fill="#00ff88"/>
+          <!-- Eyes -->
+          <circle cx="179" cy="81" r="2.5" fill="#07070f"/>
+          <circle cx="190" cy="81" r="2.5" fill="#07070f"/>
+          <!-- Pupils -->
+          <circle cx="180" cy="81" r="1" fill="#00ff88"/>
+          <circle cx="191" cy="81" r="1" fill="#00ff88"/>
+
+          <!-- Red snake (enemy) -->
+          <rect x="200" y="180" width="14" height="14" rx="2" fill="#ff3366" opacity=".2"/>
+          <rect x="186" y="180" width="14" height="14" rx="2" fill="#ff3366" opacity=".35"/>
+          <rect x="172" y="180" width="14" height="14" rx="2" fill="#ff3366" opacity=".5"/>
+          <rect x="172" y="166" width="14" height="14" rx="2" fill="#ff3366" opacity=".65"/>
+          <rect x="172" y="152" width="14" height="14" rx="2" fill="#ff3366" opacity=".8"/>
+          <!-- red head -->
+          <rect x="172" y="136" width="16" height="16" rx="3" fill="#ff3366"/>
+          <circle cx="177" cy="141" r="2" fill="#07070f"/>
+          <circle cx="184" cy="141" r="2" fill="#07070f"/>
+
+          <!-- Fruits -->
+          <circle cx="60" cy="60" r="8" fill="#ffaa00"/>
+          <circle cx="57" cy="57" r="2.5" fill="rgba(255,255,255,.3)"/>
+          <circle cx="200" cy="100" r="7" fill="#44ddff"/>
+          <circle cx="197" cy="97" r="2" fill="rgba(255,255,255,.3)"/>
+          <circle cx="220" cy="50" r="8" fill="#ff3366"/>
+          <circle cx="217" cy="47" r="2.5" fill="rgba(255,255,255,.3)"/>
+          <circle cx="40" cy="200" r="7" fill="#00ff88"/>
+          <circle cx="37" cy="197" r="2" fill="rgba(255,255,255,.3)"/>
+
+          <!-- Bonus -->
+          <rect x="220" y="160" width="22" height="22" rx="3" fill="rgba(232,255,0,.12)" stroke="rgba(232,255,0,.5)" stroke-width="1.5"/>
+          <text x="231" y="177" text-anchor="middle" font-size="12" fill="#e8ff00">⚡</text>
+
+          <!-- Animated dotted path -->
+          <path class="snake-path" d="M130 200 Q 180 200 200 160 Q 220 120 200 80" stroke="rgba(232,255,0,.15)" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  </a>
+
+  <!-- SECTION: EN DÉVELOPPEMENT -->
+  <div class="section-label">
+    <h2>En développement</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="games-grid">
+
+    <!-- TETRIS BATTLE ROYALE -->
+    <div class="game-card">
+      <div class="card-glow"></div>
+      <div class="card-art-wrap">
+        <div class="card-art art-tetris">
+          <div class="noise-bg"></div>
+          <svg width="220" height="180" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Grid lines -->
+            <line x1="60" y1="0" x2="60" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <line x1="80" y1="0" x2="80" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <line x1="100" y1="0" x2="100" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <line x1="120" y1="0" x2="120" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <line x1="140" y1="0" x2="140" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <line x1="160" y1="0" x2="160" y2="180" stroke="rgba(255,45,85,.06)" stroke-width="1"/>
+            <!-- Stacked blocks (bottom) -->
+            <rect x="60" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.1s"/>
+            <rect x="80" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.15s"/>
+            <rect x="100" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.2s"/>
+            <rect x="120" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.25s"/>
+            <rect x="140" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.3s"/>
+            <rect x="160" y="140" width="18" height="18" rx="2" fill="#ff2d55" opacity=".9" class="tet-block" style="animation-delay:.35s"/>
+            <rect x="60" y="120" width="18" height="18" rx="2" fill="#ff6b35" opacity=".8" class="tet-block" style="animation-delay:.2s"/>
+            <rect x="80" y="120" width="18" height="18" rx="2" fill="#ffaa00" opacity=".8" class="tet-block" style="animation-delay:.25s"/>
+            <rect x="100" y="120" width="18" height="18" rx="2" fill="#ff6b35" opacity=".8" class="tet-block" style="animation-delay:.3s"/>
+            <rect x="140" y="120" width="18" height="18" rx="2" fill="#ffaa00" opacity=".8" class="tet-block" style="animation-delay:.35s"/>
+            <rect x="160" y="120" width="18" height="18" rx="2" fill="#ff6b35" opacity=".8" class="tet-block" style="animation-delay:.4s"/>
+            <rect x="60" y="100" width="18" height="18" rx="2" fill="#ff2d55" opacity=".6"/>
+            <rect x="100" y="100" width="18" height="18" rx="2" fill="#ffaa00" opacity=".6"/>
+            <rect x="120" y="100" width="18" height="18" rx="2" fill="#ff2d55" opacity=".6"/>
+            <!-- Falling I-piece -->
+            <rect x="120" y="20" width="18" height="18" rx="2" fill="#00d4ff" opacity=".9" class="tet-block" style="animation-delay:.5s"/>
+            <rect x="120" y="42" width="18" height="18" rx="2" fill="#00d4ff" opacity=".9" class="tet-block" style="animation-delay:.55s"/>
+            <rect x="120" y="64" width="18" height="18" rx="2" fill="#00d4ff" opacity=".9" class="tet-block" style="animation-delay:.6s"/>
+            <rect x="120" y="86" width="18" height="18" rx="2" fill="#00d4ff" opacity=".9" class="tet-block" style="animation-delay:.65s"/>
+            <!-- T-piece incoming -->
+            <rect x="80" y="30" width="18" height="18" rx="2" fill="#e8ff00" opacity=".7" class="tet-block" style="animation-delay:.7s"/>
+            <rect x="60" y="52" width="18" height="18" rx="2" fill="#e8ff00" opacity=".7" class="tet-block" style="animation-delay:.75s"/>
+            <rect x="80" y="52" width="18" height="18" rx="2" fill="#e8ff00" opacity=".7" class="tet-block" style="animation-delay:.8s"/>
+            <rect x="100" y="52" width="18" height="18" rx="2" fill="#e8ff00" opacity=".7" class="tet-block" style="animation-delay:.85s"/>
+            <!-- Explosion / line clear flash -->
+            <rect x="58" y="138" width="124" height="22" rx="2" fill="rgba(255,45,85,.08)"/>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-title">TETRIS<br>BATTLE ROYALE</div>
+          <span class="tag tag-wip">Dev</span>
+        </div>
+        <p class="card-desc">99 joueurs, une grille qui rétrécit. Les lignes que tu effaçes s'envoient chez les autres. Dernier debout gagne.</p>
+        <div class="card-meta">
+          <div class="meta-item"><div class="dot-sm" style="background:#ff2d55"></div>Battle Royale</div>
+          <div class="meta-item"><div class="dot-sm" style="background:#ffaa00"></div>99 joueurs</div>
+          <div class="play-btn" style="pointer-events:none;opacity:.4;transform:none">BIENTÔT</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLACEHOLDER 3 -->
+    <div class="game-card card-soon">
+      <div class="card-art-wrap">
+        <div class="card-art art-soon">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <rect x="8" y="8" width="64" height="64" rx="4" stroke="rgba(255,255,255,.06)" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <text x="40" y="46" text-anchor="middle" font-size="28" fill="rgba(255,255,255,.08)">?</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-title" style="color:rgba(221,224,255,.25)">??? GAME</div>
+          <span class="tag tag-coming">Annoncé</span>
+        </div>
+        <p class="card-desc">Quelque chose arrive… Restez connectés.</p>
+        <div class="card-meta">
+          <div class="meta-item">Mystère</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLACEHOLDER 4 -->
+    <div class="game-card card-soon">
+      <div class="card-art-wrap">
+        <div class="card-art art-soon">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <rect x="8" y="8" width="64" height="64" rx="4" stroke="rgba(255,255,255,.06)" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <text x="40" y="46" text-anchor="middle" font-size="28" fill="rgba(255,255,255,.08)">?</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-title" style="color:rgba(221,224,255,.25)">??? GAME</div>
+          <span class="tag tag-coming">Annoncé</span>
+        </div>
+        <p class="card-desc">Une nouvelle expérience multijoueur se prépare.</p>
+        <div class="card-meta">
+          <div class="meta-item">Mystère</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BIENTÔT : MORE COMING -->
+  <div class="section-label">
+    <h2>Dans le pipeline</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="soon-grid">
+    <div class="soon-card">
+      <div class="soon-title">PONG WARS</div>
+      <div class="soon-sub">Pong multijoueur avec destruction de terrain. 2v2 ou 4v4.</div>
+      <span class="soon-tag">Concept</span>
+    </div>
+    <div class="soon-card">
+      <div class="soon-title">BOMBERMAN.IO</div>
+      <div class="soon-sub">Pose des bombes, explose tes adversaires. Arène compétitive en ligne.</div>
+      <span class="soon-tag">Concept</span>
+    </div>
+    <div class="soon-card">
+      <div class="soon-title">MINESWEEPER BR</div>
+      <div class="soon-sub">Démineur battle royale. La carte rétrécit, les mines se multiplient.</div>
+      <span class="soon-tag">Idée</span>
+    </div>
+    <div class="soon-card">
+      <div class="soon-title">???.IO</div>
+      <div class="soon-sub">Votre prochain jeu préféré. On travaille dessus.</div>
+      <span class="soon-tag">Secret</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span class="footer-logo">RGNGAMES</span>
+    <span>Arcade multijoueur en ligne · 2025</span>
+    <span>Tous droits réservés</span>
+  </footer>
+
+</main>
+
+<script>
+/* ── Fake player counter ── */
+(function(){
+  const el = document.getElementById('playerCount');
+  let base = 47 + Math.floor(Math.random()*30);
+  el.textContent = base;
+  setInterval(()=>{
+    base += Math.floor(Math.random()*5)-2;
+    base = Math.max(12, Math.min(200, base));
+    el.textContent = base;
+  }, 4000);
+})();
+</script>
+
+</body>
+</html>
