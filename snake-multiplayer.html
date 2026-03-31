@@ -394,7 +394,7 @@ function startOnlineGame(room){
     if(isHost){clearInterval(tickInterval);tickInterval=setInterval(onlineTick,TICK_MS);}
   });
   // Listeners
-  fbListen(`rooms/${roomId}/snakes`,s=>{if(s.exists()){snakes=s.val();updateHUD();}});
+  fbListen(`rooms/${roomId}/snakes`,s=>{if(s.exists()){snakes=s.val();updateHUD();if(snakes[myId]&&snakes[myId].dir)myDir=snakes[myId].dir;}});
   fbListen(`rooms/${roomId}/dirs`,s=>{if(s.exists())remoteDirs=s.val()||{};});
   fbListen(`rooms/${roomId}/fruits`,s=>{if(s.exists())fruits=arr(s.val());});
   fbListen(`rooms/${roomId}/bonuses`,s=>{if(s.exists())bonuses=arr(s.val());});
@@ -586,7 +586,6 @@ document.addEventListener('keydown',e=>{
 function pushDir(d){
   const opp={UP:'DOWN',DOWN:'UP',LEFT:'RIGHT',RIGHT:'LEFT'};
   if(d===opp[myDir])return;
-  if(d===myDir)return;
   myDir=d;
   if(soloMode){
     if(snakes[myId])snakes[myId].dir=d;
