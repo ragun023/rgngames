@@ -557,9 +557,10 @@ function soloTick(){
 
 /* ═══ DIRECTION ═══ */
 document.addEventListener('keydown',e=>{
-  // Ne pas intercepter les touches si on est dans un champ texte
+  // Ne pas intercepter si on tape dans un champ texte
   const tag=document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA')return;
+
   const map={
     ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
     // QWERTY
@@ -569,7 +570,13 @@ document.addEventListener('keydown',e=>{
     z:'UP',Z:'UP',
     q:'LEFT',Q:'LEFT',
   };
-  if(map[e.key]){e.preventDefault();pushDir(map[e.key]);}
+
+  // Bloquer le scroll des flèches UNIQUEMENT pendant la partie
+  const isArrow=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key);
+  const inGame=document.getElementById('game').classList.contains('active');
+  if(isArrow && inGame) e.preventDefault();
+
+  if(map[e.key]) pushDir(map[e.key]);
 });
 ['up','down','left','right'].forEach(dir=>{
   document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{
