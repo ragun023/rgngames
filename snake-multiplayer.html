@@ -557,15 +557,17 @@ function soloTick(){
 
 /* ═══ DIRECTION ═══ */
 document.addEventListener('keydown',e=>{
+  // Ne pas intercepter les touches si on est dans un champ texte
+  const tag=document.activeElement.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA')return;
   const map={
     ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
     // QWERTY
     w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',
     W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT',
-    // AZERTY (z=haut, s=bas, q=gauche, d=droite)
+    // AZERTY
     z:'UP',Z:'UP',
     q:'LEFT',Q:'LEFT',
-    // s et d déjà présents
   };
   if(map[e.key]){e.preventDefault();pushDir(map[e.key]);}
 });
