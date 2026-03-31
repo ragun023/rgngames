@@ -557,9 +557,16 @@ function soloTick(){
 
 /* ═══ DIRECTION ═══ */
 document.addEventListener('keydown',e=>{
-  const map={ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
-             w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',
-             W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT'};
+  const map={
+    ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
+    // QWERTY
+    w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',
+    W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT',
+    // AZERTY (z=haut, s=bas, q=gauche, d=droite)
+    z:'UP',Z:'UP',
+    q:'LEFT',Q:'LEFT',
+    // s et d déjà présents
+  };
   if(map[e.key]){e.preventDefault();pushDir(map[e.key]);}
 });
 ['up','down','left','right'].forEach(dir=>{
