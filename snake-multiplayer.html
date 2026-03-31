@@ -168,25 +168,20 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   </div>
 </div>
 
-<!-- Firebase config banner -->
-<div id="cfg-banner">
-  <span>⚠️ Remplacez <strong>firebaseConfig</strong> dans le code par vos identifiants.
-  <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Créer projet → Realtime Database (mode test)</span>
-  <button onclick="document.getElementById('cfg-banner').remove()">OK</button>
-</div>
 
 <script type="module">
 /* ══════════════════════════════════════
    🔥 REMPLACEZ ICI VOTRE CONFIG FIREBASE
    ══════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey:            "VOTRE_API_KEY",
-  authDomain:        "VOTRE_PROJECT.firebaseapp.com",
-  databaseURL:       "https://VOTRE_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:         "VOTRE_PROJECT",
-  storageBucket:     "VOTRE_PROJECT.appspot.com",
-  messagingSenderId: "VOTRE_SENDER_ID",
-  appId:             "VOTRE_APP_ID"
+  apiKey:            "AIzaSyCp91usepeKYahLzIa3mahoZAgUBhF9dPg",
+  authDomain:        "rgngames-1b813.firebaseapp.com",
+  databaseURL:       "https://rgngames-1b813-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "rgngames-1b813",
+  storageBucket:     "rgngames-1b813.firebasestorage.app",
+  messagingSenderId: "373742662256",
+  appId:             "1:373742662256:web:900a5633213dc3189a7ab5",
+  measurementId:     "G-M1WFBHVDJ0"
 };
 const FIREBASE_CONFIGURED = !firebaseConfig.apiKey.startsWith('VOTRE');
 
