@@ -215,7 +215,7 @@ let myId=null, myColor=SNAKE_COLORS[0], myName='';
 let roomId=null;
 
 /* ═══ GAME STATE (shared) ═══ */
-let snakes={}, fruits=[], bonuses=[], effects={};
+let snakes={}, fruits=[], bonuses=[], effects={}, remoteDirs={};
 let myDir='RIGHT', isDead=false;
 let tickInterval=null, isHost=false;
 let killFeedSeen=0, killFeedAll=[];
@@ -373,7 +373,8 @@ async function launchOnlineGame(players){
     [`rooms/${roomId}/fruits`]:genFruits(),
     [`rooms/${roomId}/bonuses`]:genBonuses(),
     [`rooms/${roomId}/effects`]:{},
-    [`rooms/${roomId}/kills`]:{}
+    [`rooms/${roomId}/kills`]:{},
+    [`rooms/${roomId}/dirs`]:{}
   });
 }
 
@@ -394,6 +395,7 @@ function startOnlineGame(room){
   });
   // Listeners
   fbListen(`rooms/${roomId}/snakes`,s=>{if(s.exists()){snakes=s.val();updateHUD();}});
+  fbListen(`rooms/${roomId}/dirs`,s=>{if(s.exists())remoteDirs=s.val()||{};});
   fbListen(`rooms/${roomId}/fruits`,s=>{if(s.exists())fruits=arr(s.val());});
   fbListen(`rooms/${roomId}/bonuses`,s=>{if(s.exists())bonuses=arr(s.val());});
   fbListen(`rooms/${roomId}/effects`,s=>{if(s.exists())effects=s.val()||{};});
@@ -417,6 +419,14 @@ async function onlineTick(){
   const now=Date.now();
 
   const upd={};
+  // Apply latest directions from clients before moving
+  const dirs=room.dirs||{};
+  Object.keys(sv).forEach(id=>{
+    if(sv[id]&&dirs[id]){
+      const opp={UP:'DOWN',DOWN:'UP',LEFT:'RIGHT',RIGHT:'LEFT'};
+      if(dirs[id]!==opp[sv[id].dir]) sv[id].dir=dirs[id];
+    }
+  });
   // Move snakes
   Object.entries(sv).forEach(([id,snake])=>{
     if(!snake.alive)return;
@@ -547,18 +557,26 @@ function soloTick(){
 
 /* ═══ DIRECTION ═══ */
 document.addEventListener('keydown',e=>{
-  const map={ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT'};
+  const map={ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
+             w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',
+             W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT'};
   if(map[e.key]){e.preventDefault();pushDir(map[e.key]);}
 });
 ['up','down','left','right'].forEach(dir=>{
-  document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{e.preventDefault();pushDir(dir.toUpperCase());},{passive:false});
+  document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{
+    e.preventDefault();pushDir(dir.toUpperCase());
+  },{passive:false});
 });
 function pushDir(d){
   const opp={UP:'DOWN',DOWN:'UP',LEFT:'RIGHT',RIGHT:'LEFT'};
   if(d===opp[myDir])return;
+  if(d===myDir)return;
   myDir=d;
-  if(soloMode){if(snakes[myId])snakes[myId].dir=d;}
-  else if(FB&&roomId){FB.update(fbRef(`rooms/${roomId}/snakes/${myId}`),{dir:d});}
+  if(soloMode){
+    if(snakes[myId])snakes[myId].dir=d;
+  } else if(FB&&roomId){
+    FB.set(fbRef(`rooms/${roomId}/dirs/${myId}`),d);
+  }
 }
 
 /* ═══ KILL FEED ═══ */
